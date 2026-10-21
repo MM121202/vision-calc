@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机器视觉选型计算器 · 视野 / 精度 → 相机 + 镜头</title>
+<style>
+:root{
+  --bg:#ffffff; --card:#f7f7f5; --card2:#ffffff; --border:#e3e1da;
+  --text:#1a1a18; --muted:#6b6a64; --line:#e8e6df;
+  --accent:#185fa5; --accent-bg:#e6f1fb; --accent-line:#b5d4f4;
+  --warn:#854f0b; --warn-bg:#faeeda; --warn-line:#fac775;
+  --danger:#a32d2d; --danger-bg:#fcebeb; --danger-line:#f7c1c1;
+  --ok:#0f6e56; --ok-bg:#e1f5ee; --ok-line:#9fe1cb;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16161a; --card:#1f1f24; --card2:#232329; --border:#33333b;
+    --text:#ededf0; --muted:#9a99a3; --line:#2c2c33;
+    --accent:#85b7eb; --accent-bg:#16283b; --accent-line:#2f4d6e;
+    --warn:#ef9f27; --warn-bg:#2e2410; --warn-line:#5a4413;
+    --danger:#f09595; --danger-bg:#2c1414; --danger-line:#5a2222;
+    --ok:#5dcaa5; --ok-bg:#10251d; --ok-line:#1c4636;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.6;
+  padding:28px 20px 60px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:22px;font-weight:600;letter-spacing:.3px}
+.sub{color:var(--muted);font-size:13px;margin-top:6px;margin-bottom:24px}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:22px;align-items:start}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px}
+.panel h2{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel h2 .tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:1px 7px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.field .row{display:flex;align-items:center;gap:8px}
+.field input[type=number],.field select{
+  width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:8px 10px;font-size:14px;font-family:var(--mono);outline:none;
+}
+.field input[type=number]:focus,.field select:focus{border-color:var(--accent)}
+.field .unit{font-size:12px;color:var(--muted);white-space:nowrap;font-family:var(--mono)}
+.presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.preset{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--border);
+  background:var(--card2);color:var(--text);cursor:pointer;transition:.15s}
+.preset:hover{border-color:var(--accent);color:var(--accent)}
+.hint{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.5}
+.results{display:flex;flex-direction:column;gap:16px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:680px){.cards{grid-template-columns:1fr}}
+.card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card .k{font-size:12px;color:var(--muted)}
+.card .v{font-size:26px;font-weight:600;margin-top:6px;font-family:var(--mono);letter-spacing:.5px}
+.card .u{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.card.blue{border-color:var(--accent-line);background:var(--accent-bg)}
+.detail{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.detail table{width:100%;border-collapse:collapse;font-size:13px}
+.detail td{padding:7px 0;border-bottom:1px solid var(--line)}
+.detail tr:last-child td{border-bottom:none}
+.detail td:first-child{color:var(--muted)}
+.detail td:last-child{text-align:right;font-family:var(--mono)}
+.badge{display:inline-block;font-size:11px;font-weight:500;border-radius:6px;padding:2px 8px;margin-left:8px}
+.b-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-line)}
+.b-warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.b-bad{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line)}
+.visual{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:680px){.visual{grid-template-columns:1fr}}
+.vbox{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px}
+.vbox h3{font-size:13px;font-weight:600;margin-bottom:10px;color:var(--muted)}
+canvas{width:100%;height:auto;border-radius:8px;border:1px solid var(--border);background:var(--card)}
+.notes{margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:13px;color:var(--muted);line-height:1.75}
+.notes b{color:var(--text)}
+.notes code{font-family:var(--mono);background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;color:var(--accent);font-size:12.5px}
+.foot{margin-top:24px;font-size:11.5px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>机器视觉选型计算器</h1>
+  <div class="sub">输入最大视野与精度要求（毫米），反推所需相机分辨率与镜头焦距。适用于瓶盖、PCB、外观检测等定量/定性成像方案。</div>
+
+  <div class="grid">
+    <!-- ============ 输入 ============ -->
+    <div class="panel">
+      <h2>成像需求 <span class="tag">必填</span></h2>
+
+      <div class="field">
+        <label>最大视野 长边 FOV（mm）</label>
+        <div class="row"><input id="fov" type="number" value="40" step="0.5" min="0.1"><span class="unit">mm</span></div>
+        <div class="hint">要拍下的范围。瓶盖≈40，PCB焊盘≈30，整屏≈150</div>
+      </div>
+
+      <div class="field">
+        <label>精度要求（mm）</label>
+        <div class="row"><input id="prec" type="number" value="0.15" step="0.01" min="0.001"><span class="unit">mm</span></div>
+      </div>
+
+      <div class="field">
+        <label>精度口径</label>
+        <select id="mode">
+          <option value="defect">最小缺陷尺寸（需 ÷覆盖像素）</option>
+          <option value="pixel">单像素分辨率（直接等于）</option>
+        </select>
+        <div class="hint">行业常给"最小缺陷尺寸"，需再除以覆盖像素才到单像素精度</div>
+      </div>
+
+      <div class="field">
+        <label>缺陷覆盖像素数（取 3~5）</label>
+        <div class="row"><input id="cov" type="number" value="4" step="1" min="2" max="10"><span class="unit">px</span></div>
+        <div class="hint">想稳定分辨一个缺陷，至少要覆盖 3~5 个像素，不是 1 个</div>
+      </div>
+
+      <h2 style="margin-top:20px">硬件参数 <span class="tag">影响镜头</span></h2>
+
+      <div class="field">
+        <label>传感器靶面</label>
+        <select id="sensor">
+          <option value="1/2.3">1/2.3" (6.17×4.55mm)</option>
+          <option value="1/1.8">1/1.8" (7.18×5.32mm)</option>
+          <option value="2/3" selected>2/3" (8.8×6.6mm)</option>
+          <option value="1">1" (12.8×9.6mm)</option>
+          <option value="1.1">1.1" (14.1×10.3mm)</option>
+          <option value="4/3">4/3" (17.3×13.0mm)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>工作距离 WD（mm）</label>
+        <div class="row"><input id="wd" type="number" value="160" step="5" min="10"><span class="unit">mm</span></div>
+        <div class="hint">镜头到物体的距离，决定焦距</div>
+      </div>
+
+      <div class="field">
+        <label>光圈 F 数</label>
+        <div class="row"><input id="fn" type="number" value="8" step="0.5" min="1.2"><span class="unit">F</span></div>
+        <div class="hint">越大景深越深、进光越少</div>
+      </div>
+
+      <div class="field">
+        <label>物体高度波动 Δh（mm）</label>
+        <div class="row"><input id="dh" type="number" value="0.2" step="0.05" min="0"><span class="unit">mm</span></div>
+        <div class="hint">传送带上盖子跳动 / 顶面弧度，用于评估透视与景深</div>
+      </div>
+
+      <div class="presets">
+        <span class="preset" data-fov="40" data-prec="0.15" data-mode="defect">瓶盖外观</span>
+        <span class="preset" data-fov="30" data-prec="0.03" data-mode="defect">PCB 焊点</span>
+        <span class="preset" data-fov="150" data-prec="0.05" data-mode="defect">手机屏幕</span>
+        <span class="preset" data-fov="60" data-prec="0.20" data-mode="defect">药品包装</span>
+      </div>
+    </div>
+
+    <!-- ============ 结果 ============ -->
+    <div class="results">
+      <div class="cards">
+        <div class="card blue">
+          <div class="k">所需分辨率</div>
+          <div class="v" id="rRes">—</div>
+          <div class="u" id="rResSub">宽×高</div>
+        </div>
+        <div class="card">
+          <div class="k">推荐相机</div>
+          <div class="v" id="rCam">—</div>
+          <div class="u" id="rCamSub">像素档位</div>
+        </div>
+        <div class="card">
+          <div class="k">推荐镜头焦距</div>
+          <div class="v" id="rFocal">—</div>
+          <div class="u" id="rFocalSub">标准焦段</div>
+        </div>
+      </div>
+
+      <div class="detail">
+        <table>
+          <tr><td>单像素精度（所需）</td><td id="rPix">—</td></tr>
+          <tr><td>单像素精度（实际，用推荐相机）</td><td id="rPixReal">—</td></tr>
+          <tr><td>系统放大率 β</td><td id="rBeta">—</td></tr>
+          <tr><td>视野短边 FOV（自动）</td><td id="rFovH">—</td></tr>
+          <tr><td>镜头解析力要求</td><td id="rLpmm">—</td></tr>
+          <tr><td>景深估算（允许弥散圆=2×像素）</td><td id="rDof">—</td></tr>
+          <tr><td>透视放大率漂移 ≈ Δh/WD</td><td id="rPersp">—</td></tr>
+          <tr><td>透视误差 vs 精度要求</td><td id="rPerspChk">—</td></tr>
+        </table>
+      </div>
+
+      <div class="visual">
+        <div class="vbox">
+          <h3>像素网格示意（中心区域）</h3>
+          <canvas id="cv" width="640" height="480"></canvas>
+        </div>
+        <div class="vbox">
+          <h3>选型结论</h3>
+          <div id="verdict" style="font-size:13px;line-height:1.8"></div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <b>背后的公式</b><br>
+        · 单像素精度 = 精度要求 ÷ 覆盖像素（口径=缺陷时）<br>
+        · 所需横向像素 = FOV长边 ÷ 单像素精度；总像素按传感器比例换算<br>
+        · 镜头焦距 <code>f = 工作距离 × 传感器宽 ÷ FOV长边</code>，再就近取标准焦段（12/16/25/35/50/75/100mm）<br>
+        · 透视放大率漂移 <code>≈ Δh ÷ 工作距离</code>；若它 ≥ 精度要求，<b>必须上远心镜头</b>或把 Δh 压到更小<br>
+        · 景深 <code>≈ 2 × 允许弥散圆 × F数 × (1+β) ÷ β²</code>，若高度波动超出景深会拍虚
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">最简模型，未计入畸变、光照对比度、相机实际像元尺寸离散性。落地前请用实拍标定验证。</div>
+</div>
+
+<script>
+const SENSORS = {
+  "1/2.3":{w:6.17,h:4.55}, "1/1.8":{w:7.18,h:5.32},
+  "2/3":{w:8.8,h:6.6}, "1":{w:12.8,h:9.6},
+  "1.1":{w:14.1,h:10.3}, "4/3":{w:17.3,h:13.0}
+};
+const CAMERAS = [
+  {name:"30万", w:640, h:480}, {name:"130万", w:1280, h:1024},
+  {name:"200万", w:1600, h:1200}, {name:"300万", w:2048, h:1536},
+  {name:"500万", w:2592, h:1944}, {name:"600万", w:3072, h:2048},
+  {name:"800万", w:3264, h:2448}, {name:"1000万", w:3840, h:2748},
+  {name:"1200万", w:4096, h:3000}, {name:"2000万", w:5472, h:3648},
+  {name:"2500万", w:5120, h:5120}
+];
+const FOCALS = [6,8,12,16,25,35,50,75,100];
+
+const $ = id => document.getElementById(id);
+const fmt = (n,d=2)=> (isFinite(n)? n.toFixed(d): "—");
+
+function compute(){
+  const fov = +$("fov").value;
+  const prec = +$("prec").value;
+  const mode = $("mode").value;
+  const cov = +$("cov").value;
+  const wd = +$("wd").value;
+  const fn = +$("fn").value;
+  const dh = +$("dh").value;
+  const s = SENSORS[$("sensor").value];
+
+  if(!(fov>0)||!(prec>0)) return;
+
+  const pixel = (mode==="defect") ? prec/cov : prec;     // mm/px
+  const fovH = fov * s.h / s.w;
+  const pxW = fov / pixel;
+  const pxH = fovH / pixel;
+
+  let cam = CAMERAS.find(c=> c.w>=pxW && c.h>=pxH) || CAMERAS[CAMERAS.length-1];
+  const pixReal = fov / cam.w;                            // 实际单像素
+  const beta = s.w / fov;                                // 放大率
+
+  const fIdeal = wd * s.w / fov;
+  const fStd = FOCALS.reduce((a,b)=> Math.abs(b-fIdeal)<Math.abs(a-fIdeal)? b:a, FOCALS[0]);
+  const wdReal = fStd * fov / s.w;
+
+  const lpmm = 1 / (2*pixel);                            // 奈奎斯特
+  const C = 2*pixReal;                                   // 允许弥散圆
+  const dof = 2*C*fn*(1+beta)/(beta*beta);
+  const persp = dh/wd;                                   // 相对漂移
+  const perspErr = fov * persp;                          // 在FOV尺度上的测量误差 mm
+
+  // 输出
+  $("rRes").textContent = Math.ceil(pxW)+"×"+Math.ceil(pxH);
+  $("rResSub").textContent = "≈ "+fmt(pxW*pxH/1e6,1)+" MP（按传感器比例）";
+  $("rCam").textContent = cam.name;
+  $("rCamSub").textContent = cam.w+"×"+cam.h+" 像元";
+  $("rFocal").textContent = fStd+" mm";
+  $("rFocalSub").textContent = "理想 "+fmt(fIdeal,1)+"mm · 实距 "+fmt(wdReal,0)+"mm";
+
+  $("rPix").textContent = fmt(pixel,4)+" mm/px";
+  $("rPixReal").textContent = fmt(pixReal,4)+" mm/px";
+  $("rBeta").textContent = fmt(beta,3);
+  $("rFovH").textContent = fmt(fovH,2)+" mm";
+  $("rLpmm").textContent = fmt(lpmm,0)+" lp/mm";
+  $("rDof").textContent = fmt(dof,1)+" mm";
+
+  $("rPersp").textContent = fmt(persp*100,3)+"%";
+  let pchk, pcls;
+  if(perspErr > prec){
+    pchk = "超标 "+fmt(perspErr/prec,1)+"× → 建议远心";
+    pcls = "b-bad";
+  } else if(perspErr > prec*0.5){
+    pchk = "临界 → 注意 Δh";
+    pcls = "b-warn";
+  } else {
+    pchk = "安全（"+fmt(perspErr/prec*100,0)+"% 预算）";
+    pcls = "b-ok";
+  }
+  $("rPerspChk").innerHTML = (fmt(perspErr,3)+" mm "+'<span class="badge '+pcls+'">'+pchk+'</span>');
+
+  drawGrid(pixel, cam.w, fov, mode, prec, cov, persp, dh, wd, dof);
+  verdict({pixel,pixReal,cam,fStd,fIdeal,wdReal,lpmm,persp,perspErr,prec,dof,dh,wd});
+}
+
+function drawGrid(pixel, camW, fov, mode, prec, cov, persp, dh, wd, dof){
+  const cv = $("cv"); const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const css = getComputedStyle(document.body);
+  const gridCol = css.getPropertyValue('--line').trim() || '#e8e6df';
+  const txtCol = css.getPropertyValue('--muted').trim() || '#6b6a64';
+  const accCol = css.getPropertyValue('--accent').trim() || '#185fa5';
+  const cardBg = css.getPropertyValue('--card').trim() || '#f7f7f5';
+
+  ctx.fillStyle = cardBg; ctx.fillRect(0,0,W,H);
+
+  // 显示约 30 列像素（中心区域），据此定每格像素尺寸
+  const cols = 30;
+  const cell = W/cols;
+  const rows = Math.floor(H/cell);
+  const startX = (W - cols*cell)/2;
+  const startY = (H - rows*cell)/2;
+
+  // 网格
+  ctx.strokeStyle = gridCol; ctx.lineWidth = 1;
+  for(let i=0;i<=cols;i++){ ctx.beginPath(); ctx.moveTo(startX+i*cell,startY); ctx.lineTo(startX+i*cell,startY+rows*cell); ctx.stroke(); }
+  for(let j=0;j<=rows;j++){ ctx.beginPath(); ctx.moveTo(startX,startY+j*cell); ctx.lineTo(startX+cols*cell,startY+j*cell); ctx.stroke(); }
+
+  // 缺陷示意：覆盖 cov 个像素（取接近 sqrt 的方块）
+  const side = Math.max(2, Math.round(Math.sqrt(cov)));
+  const dCol = Math.floor(cols/2 - side/2), dRow = Math.floor(rows/2 - side/2);
+  ctx.fillStyle = 'rgba(227,75,74,0.85)';
+  ctx.fillRect(startX+dCol*cell, startY+dRow*cell, side*cell, side*cell);
+
+  // 标注
+  ctx.fillStyle = txtCol; ctx.font = "13px ui-monospace,monospace";
+  ctx.fillText("1 格 = "+fmt(pixel,4)+" mm", 10, 22);
+  const realW = cols*pixel, realH = rows*pixel;
+  ctx.fillText("框内 = "+fmt(realW,1)+"×"+fmt(realH,1)+" mm", 10, 40);
+  ctx.fillStyle = accCol;
+  ctx.fillText("● 缺陷 ≈ "+fmt(cov,0)+" px 覆盖", 10, H-14);
+}
+
+function verdict(o){
+  const v = $("verdict");
+  let s = "";
+  s += "· 单像素精度需 ≤ <b>"+fmt(o.pixel,4)+" mm</b>，对应 <b>"+o.cam.name+"</b>（"+o.cam.w+"×"+o.cam.h+"）相机。<br>";
+  s += "· 镜头取标准 <b>"+o.fStd+"mm</b>（理想 "+fmt(o.fIdeal,1)+"mm），实际工作距离需对齐到 <b>"+fmt(o.wdReal,0)+"mm</b>。<br>";
+  s += "· 镜头解析力须 ≥ <b>"+fmt(o.lpmm,0)+" lp/mm</b>，否则像素虚耗。<br>";
+  if(o.perspErr > o.prec){
+    const dhMax = o.prec * o.wd / o.fov;
+    s += '<span class="badge b-bad" style="margin-top:6px">透视超标</span> 漂移 '+fmt(o.persp*100,2)+'% 已吃光精度，<b>定量测量必须上远心镜头</b>，或把高度波动压到 '+fmt(dhMax,3)+'mm 以内。<br>';
+  } else {
+    s += '· 透视漂移 '+fmt(o.persp*100,2)+'%，<b>定性检测可用普通定焦</b>。<br>';
+  }
+  if(o.dh > o.dof){
+    s += '· ⚠ 高度波动 '+fmt(o.dh,2)+'mm 超出景深 '+fmt(o.dof,1)+'mm，会拍虚，需收小光圈或降工作距离。<br>';
+  } else {
+    s += "· 景深约 "+fmt(o.dof,1)+"mm，当前波动在范围内，成像清晰。<br>";
+  }
+  v.innerHTML = s;
+}
+
+// 光栅：任何输入变化即重算
+["fov","prec","mode","cov","sensor","wd","fn","dh"].forEach(id=>{
+  $(id).addEventListener("input", compute);
+  $(id).addEventListener("change", compute);
+});
+document.querySelectorAll(".preset").forEach(p=>{
+  p.addEventListener("click", ()=>{
+    $("fov").value = p.dataset.fov;
+    $("prec").value = p.dataset.prec;
+    $("mode").value = p.dataset.mode;
+    compute();
+  });
+});
+compute();
+</script>
+</body>
+</html>
