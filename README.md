@@ -9,7 +9,13 @@
 
 ## 快速开始（60 秒）
 
-**零依赖、零安装**：下载 `index.html` 双击即可，离线可用。
+**方式一：双击版软件（推荐，最省事）**
+
+下载 `VisionCalc.exe`（47KB，图标是镜头），双击即用——自动弹出默认浏览器打开计算器。零安装、零依赖、可拷贝给任何人。原理：exe 内嵌了完整页面，启动时解到本机并调用浏览器。
+
+**方式二：源码运行**
+
+零依赖、零安装：下载 `index.html` 双击即可，离线可用。
 
 ```bash
 git clone https://github.com/MM121202/vision-calc
@@ -110,7 +116,9 @@ flowchart TD
 ## 维护
 
 - 许可证：MIT
-- 版本：v2.0（v1.0 = 03c587e，仅 5 项校验、无对照/复现）
+- 版本：v2.1（v2.0 = eae86ef 加桌面双击版；v1.0 = 03c587e，仅 5 项校验）
+  - 桌面版源码：`app/Program.cs`（C# 启动器，内嵌 index.html，解到 %LOCALAPPDATA%\VisionCalc 后调默认浏览器）
+  - 重新打包：`app/build.bat`（需 .NET Framework 4.x 自带 csc）· 图标：`app/make_icon.py`
 - 后续任务：镜头畸变模型、远心镜头放大率计算、线扫方案分支、相机库接入真实型号参数
 - 引用公式来源：机器视觉选型通用工程近似（奈奎斯特采样、Rayleigh 衍射判据、景深光学公式）
 
