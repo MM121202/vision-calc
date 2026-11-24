@@ -81,7 +81,10 @@ function expect(inp) {
   const dof = 2 * (2 * pixReal) * inp.fn * (1 + beta) / (beta * beta);
   const persp = inp.dh / inp.wd;
   const perspErr = inp.fov * persp;
-  return { pixel, pxW, pxH, camIdx: cam, camW, camH, pixReal, beta, fIdeal, fStd, wdReal, lpmm, dof, persp, perspErr };
+  const fovArea = inp.fov * fovH;              // mm²
+  const pxArea = pixReal * pixReal;            // mm²/px
+  const magArea = 1 / (beta * beta);
+  return { pixel, pxW, pxH, camIdx: cam, camW, camH, pixReal, beta, fIdeal, fStd, wdReal, lpmm, dof, persp, perspErr, fovH, fovArea, pxArea, magArea };
 }
 const close = (a, b, tol) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
@@ -160,6 +163,11 @@ for (const c of CASES) {
   if (els["rBeta"].textContent !== e.beta.toFixed(3)) errs.push(`β ${els["rBeta"].textContent} != ${e.beta.toFixed(3)}`);
   // 景深（页面显示 1 位小数）
   if (els["rDof"].textContent !== e.dof.toFixed(1) + " mm") errs.push(`DOF ${els["rDof"].textContent} != ${e.dof.toFixed(1)} mm`);
+  // 覆盖面积（页面显示 "X mm²（Y cm²）"）
+  const expCovArea = e.fovArea.toFixed(0) + " mm²（" + (e.fovArea / 100).toFixed(1) + " cm²）";
+  if (els["rCovArea"] && els["rCovArea"].textContent !== expCovArea) errs.push(`覆盖面积 ${els["rCovArea"] && els["rCovArea"].textContent} != ${expCovArea}`);
+  const expCovDim = c.inp.fov.toFixed(2) + " × " + e.fovH.toFixed(2) + " mm";
+  if (els["rCovDim"] && els["rCovDim"].textContent !== expCovDim) errs.push(`覆盖尺寸 ${els["rCovDim"].textContent} != ${expCovDim}`);
   if (errs.length) { fail++; console.log(`✗ ${c.name}: ${errs.join("; ")}`); }
   else { pass++; console.log(`✓ ${c.name}  [${gotRes} / ${gotCam} / ${gotFocal}]`); }
 }
@@ -223,15 +231,24 @@ bCheck("衍射极限校验", /上限\s*[\d.]+\s*lp\/mm/.test(els["rDiff"] ? els[
   vm.runInContext("compute()", sandbox);
 }
 
+// 7) 覆盖面积面板：数值填充 + 焦距档对照表包含推荐档
+{
+  const covDim = els["rCovDim"] ? els["rCovDim"].textContent : "";
+  const covArea = els["rCovArea"] ? els["rCovArea"].textContent : "";
+  const focalCov = els["rFocalCov"] ? els["rFocalCov"].innerHTML : "";
+  bCheck("覆盖面积面板", /mm/.test(covDim) && /cm²/.test(covArea) && /焦距档 ↔ 覆盖面积对照/.test(focalCov) && /推荐档/.test(focalCov),
+    `dim=${covDim} area=${covArea} focal=${focalCov.slice(0,60)}`);
+}
+
 console.log("\n========== 基线/版本测试报告 ==========");
 console.log(`用例通过: ${pass}/${CASES.length}`);
 console.log(`B版新功能: ${bPass}/${bTotal}${bNotes.length ? "  失败项: " + bNotes.join("; ") : ""}`);
 console.log(`单次重算延迟: ${avgMs.toFixed(3)} ms (n=${N})`);
 console.log(`依赖: 0（纯单文件） · 文件: 1 个 index.html`);
 // 功能维度探测
-const dims = ["rPix","rPixReal","rBeta","rFovH","rLpmm","rDof","rPersp","rPerspChk"]
-  .filter(id => els[id] && els[id].textContent && els[id].textContent !== "—").length;
-console.log(`指标输出行数: ${dims}/8`);
+const dims = ["rPix","rPixReal","rBeta","rFovH","rLpmm","rDof","rPersp","rPerspChk","rCovDim","rCovArea","rPxArea","rMagArea"]
+  .filter(id => els[id] && ((els[id].textContent && els[id].textContent !== "—") || (els[id].innerHTML && els[id].innerHTML !== "—"))).length;
+console.log(`指标输出行数: ${dims}/12`);
 console.log(`衍射极限校验: ${els["rDiff"] && els["rDiff"].innerHTML ? "有" : "无"}`);
 console.log(`双方案对比: ${els["cmpVerdictSaved"] ? "有（"+els["cmpVerdictSaved"].replace(/<[^>]+>/g,"").slice(0,30)+"）" : "无"}`);
 console.log(`URL参数复现: ${/f=40/.test(vm.runInContext("location.hash", sandbox)) ? "有" : "无"}`);

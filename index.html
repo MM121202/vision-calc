@@ -229,6 +229,17 @@ canvas{width:100%;height:auto;border-radius:8px;border:1px solid var(--border);b
         </table>
       </div>
 
+      <div class="detail">
+        <h3 style="font-size:13px;font-weight:600;margin-bottom:10px">覆盖面积</h3>
+        <table>
+          <tr><td>视野覆盖（长×短边）</td><td id="rCovDim">—</td></tr>
+          <tr><td>覆盖面积</td><td id="rCovArea">—</td></tr>
+          <tr><td>单像素覆盖面积（实际）</td><td id="rPxArea">—</td></tr>
+          <tr><td>面积放大倍数 1/β²（视野 : 靶面）</td><td id="rMagArea">—</td></tr>
+        </table>
+        <div id="rFocalCov" style="margin-top:12px;font-size:12.5px;line-height:1.9"></div>
+      </div>
+
       <div class="visual">
         <div class="vbox">
           <h3>像素网格示意（中心区域）</h3>
@@ -249,6 +260,7 @@ canvas{width:100%;height:auto;border-radius:8px;border:1px solid var(--border);b
           <tr><td>推荐相机</td><td id="cACam" style="text-align:right;font-family:var(--mono)">—</td><td id="cBCam" style="text-align:right;font-family:var(--mono)">—</td></tr>
           <tr><td>镜头焦距（标准）</td><td id="cAFocal" style="text-align:right;font-family:var(--mono)">—</td><td id="cBFocal" style="text-align:right;font-family:var(--mono)">—</td></tr>
           <tr><td>实际单像素精度</td><td id="cAPix" style="text-align:right;font-family:var(--mono)">—</td><td id="cBPix" style="text-align:right;font-family:var(--mono)">—</td></tr>
+          <tr><td>覆盖面积</td><td id="cACov" style="text-align:right;font-family:var(--mono)">—</td><td id="cBCov" style="text-align:right;font-family:var(--mono)">—</td></tr>
           <tr><td>解析力要求</td><td id="cALp" style="text-align:right;font-family:var(--mono)">—</td><td id="cBLp" style="text-align:right;font-family:var(--mono)">—</td></tr>
           <tr><td>景深估算</td><td id="cADof" style="text-align:right;font-family:var(--mono)">—</td><td id="cBDof" style="text-align:right;font-family:var(--mono)">—</td></tr>
           <tr><td>透视误差</td><td id="cAPersp" style="text-align:right;font-family:var(--mono)">—</td><td id="cBPersp" style="text-align:right;font-family:var(--mono)">—</td></tr>
@@ -261,6 +273,7 @@ canvas{width:100%;height:auto;border-radius:8px;border:1px solid var(--border);b
         <b>背后的公式</b><br>
         · 单像素精度 = 精度要求 ÷ 覆盖像素（口径=缺陷时）<br>
         · 所需横向像素 = FOV长边 ÷ 单像素精度；总像素按传感器比例换算<br>
+        · 覆盖面积 <code>= FOV长边 × 短边</code>；单像素覆盖面积 <code>= 实际单像素精度²</code>，即 1 个像素看到的实际地盘；面积放大倍数 <code>= 1/β²</code>（视野面积 ÷ 靶面面积）<br>
         · 镜头焦距 <code>f = 工作距离 × 传感器宽 ÷ FOV长边</code>，再就近取标准焦段（12/16/25/35/50/75/100mm）<br>
         · 镜头衍射截止频率 <code>≈ 1 ÷ (波长 × F数)</code>（线对/毫米）；所需解析力超过它，像素再密也分辨不出，需换短波长光源或加大光圈<br>
         · 透视放大率漂移 <code>≈ Δh ÷ 工作距离</code>；若它 ≥ 精度要求，<b>必须上远心镜头</b>或把 Δh 压到更小<br>
@@ -323,9 +336,14 @@ function calc(inp){
   const cutoff = 1/(lamMM*fn);
   const diffMargin = cutoff / lpmm;                    // >1 表示物理上分得开
 
+  // 覆盖面积：视野长×短边围成的地盘 + 单像素对应的实际地盘
+  const fovArea = fov * fovH;                          // mm²
+  const pxArea = pixReal * pixReal;                    // mm²/px（实际，用推荐相机）
+  const magArea = 1/(beta*beta);                       // 面积放大倍数（视野:靶面）
+
   return {pixel, fovH, pxW, pxH, camIdx, cam, pixReal, beta,
           fIdeal, fStd, wdReal, lpmm, cutoff, diffMargin,
-          dof, persp, perspErr};
+          dof, persp, perspErr, fovArea, pxArea, magArea};
 }
 
 function readInputs(){
@@ -357,6 +375,25 @@ function compute(){
   $("rLpmm").textContent = fmt(o.lpmm,0)+" lp/mm";
   $("rDof").textContent = fmt(o.dof,1)+" mm";
 
+  // ---- 覆盖面积面板 ----
+  const s2 = SENSORS[inp.sensor];
+  $("rCovDim").textContent = fmt(inp.fov,2)+" × "+fmt(o.fovH,2)+" mm";
+  $("rCovArea").textContent = fmt(o.fovArea,0)+" mm²（"+fmt(o.fovArea/100,1)+" cm²）";
+  const pxAreaUm2 = o.pxArea * 1e6;
+  $("rPxArea").textContent = fmt(o.pxArea,4)+" mm² ≈ "+fmt(pxAreaUm2,0)+" µm²";
+  $("rMagArea").textContent = fmt(o.magArea,1)+"×";
+
+  // 焦距档 ↔ 当前 WD 下的覆盖面积对照
+  let ft = "<b>焦距档 ↔ 覆盖面积对照</b>（当前 WD="+fmt(inp.wd,0)+"mm，传感器 "+inp.sensor+"\"）<br>";
+  FOCALS.forEach(f=>{
+    const cw = inp.wd * s2.w / f, ch = inp.wd * s2.h / f;
+    const fit = cw >= inp.fov;
+    const mark = (f===o.fStd) ? ' <span class="badge b-ok">推荐档</span>'
+      : (fit ? "" : ' <span class="badge b-bad">盖不住</span>');
+    ft += "· f="+f+"mm → 覆盖 <b>"+fmt(cw,1)+"×"+fmt(ch,1)+"</b> mm（"+fmt(cw*ch/100,1)+" cm²）"+mark+"<br>";
+  });
+  $("rFocalCov").innerHTML = ft;
+
   $("rPersp").textContent = fmt(o.persp*100,3)+"%";
   let pchk, pcls;
   if(o.perspErr > inp.prec){
@@ -385,7 +422,7 @@ function compute(){
   }
   $("rDiff").innerHTML = ("上限 "+fmt(o.cutoff,0)+" lp/mm "+'<span class="badge '+dcls+'">'+dchk+'</span>');
 
-  drawGrid(o.pixel, o.cam.w, inp.fov, inp.mode, inp.prec, inp.cov, o.persp, inp.dh, inp.wd, o.dof);
+  drawGrid(o.pixel, o.cam.w, inp.fov, inp.mode, inp.prec, inp.cov, o.persp, inp.dh, inp.wd, o.dof, o.fovArea);
   verdict(o, inp);
   renderCompare(o, inp);
   syncHash(inp);
@@ -404,6 +441,8 @@ function renderCompare(oA, inp){
   $("cBFocal").textContent = oB.fStd+" mm（理想 "+fmt(oB.fIdeal,1)+"）";
   $("cAPix").textContent = fmt(oA.pixReal,4)+" mm/px";
   $("cBPix").textContent = fmt(oB.pixReal,4)+" mm/px";
+  $("cACov").textContent = fmt(oA.fovArea/100,1)+" cm²";
+  $("cBCov").textContent = fmt(oB.fovArea/100,1)+" cm²";
   $("cALp").textContent = fmt(oA.lpmm,0)+" / 上限 "+fmt(oA.cutoff,0)+" lp/mm";
   $("cBLp").textContent = fmt(oB.lpmm,0)+" / 上限 "+fmt(oB.cutoff,0)+" lp/mm";
   $("cADof").textContent = fmt(oA.dof,1)+" mm"+(oA.dof<inp.dh?" ⚠":"");
@@ -426,7 +465,7 @@ function renderCompare(oA, inp){
   $("cmpVerdict").innerHTML = s;
 }
 
-function drawGrid(pixel, camW, fov, mode, prec, cov, persp, dh, wd, dof){
+function drawGrid(pixel, camW, fov, mode, prec, cov, persp, dh, wd, dof, fovArea){
   const cv = $("cv"); const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
   const css = getComputedStyle(document.body);
@@ -460,6 +499,7 @@ function drawGrid(pixel, camW, fov, mode, prec, cov, persp, dh, wd, dof){
   ctx.fillText("1 格 = "+fmt(pixel,4)+" mm", 10, 22);
   const realW = cols*pixel, realH = rows*pixel;
   ctx.fillText("框内 = "+fmt(realW,1)+"×"+fmt(realH,1)+" mm", 10, 40);
+  ctx.fillText("整幅覆盖面积 ≈ "+fmt(fovArea/100,1)+" cm²", 10, 58);
   ctx.fillStyle = accCol;
   ctx.fillText("● 缺陷 ≈ "+fmt(cov,0)+" px 覆盖", 10, H-14);
 }
@@ -470,6 +510,7 @@ function verdict(o, inp){
   s += "· 单像素精度需 ≤ <b>"+fmt(o.pixel,4)+" mm</b>，对应 <b>"+o.cam.name+"</b>（"+o.cam.w+"×"+o.cam.h+"）相机。<br>";
   s += "· 镜头取标准 <b>"+o.fStd+"mm</b>（理想 "+fmt(o.fIdeal,1)+"mm），实际工作距离需对齐到 <b>"+fmt(o.wdReal,0)+"mm</b>。<br>";
   s += "· 镜头解析力须 ≥ <b>"+fmt(o.lpmm,0)+" lp/mm</b>，否则像素虚耗。<br>";
+  s += "· 覆盖面积 <b>"+fmt(o.fovArea/100,1)+" cm²</b>（"+fmt(inp.fov,1)+"×"+fmt(o.fovH,1)+" mm），单像素实际管 <b>"+fmt(o.pxArea*1e6,0)+" µm²</b> 地盘。<br>";
   if(o.diffMargin < 1){
     s += '<span class="badge b-bad">衍射受限</span> 波长 '+inp.wl+'nm 下镜头光学上限约 <b>'+fmt(o.cutoff,0)+' lp/mm</b>，低于需求 '+fmt(o.lpmm,0)+' lp/mm——换蓝光光源或加大光圈（减小 F 数）后再复核。<br>';
   } else {
@@ -535,6 +576,7 @@ function buildReport(inp, o){
   lines.push("  所需分辨率 "+Math.ceil(o.pxW)+"×"+Math.ceil(o.pxH)+" → 推荐 "+o.cam.name+"（"+o.cam.w+"×"+o.cam.h+"）");
   lines.push("  镜头 "+o.fStd+"mm 标准焦段（理想 "+fmt(o.fIdeal,1)+"mm，实距对齐 "+fmt(o.wdReal,0)+"mm）");
   lines.push("  实际单像素精度 "+fmt(o.pixReal,4)+"mm/px · 解析力需求 "+fmt(o.lpmm,0)+"lp/mm · 衍射余量 "+fmt(o.diffMargin,2)+"×");
+  lines.push("  覆盖面积 "+fmt(inp.fov,2)+"×"+fmt(o.fovH,2)+"mm = "+fmt(o.fovArea,0)+"mm²（"+fmt(o.fovArea/100,1)+"cm²） · 单像素覆盖 "+fmt(o.pxArea,4)+"mm² · 面积放大 "+fmt(o.magArea,1)+"×");
   lines.push("  景深 "+fmt(o.dof,1)+"mm · 透视误差 "+fmt(o.perspErr,3)+"mm（"+(o.perspErr>inp.prec?"超差，需远心":"在精度预算内")+"）");
   lines.push("三、边界声明");
   lines.push("  本报告基于最简针孔模型，未计入镜头畸变、光照对比度、实际像元离散性与装配误差；");
